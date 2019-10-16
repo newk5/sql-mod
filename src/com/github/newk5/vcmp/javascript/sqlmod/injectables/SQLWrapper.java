@@ -28,7 +28,6 @@ public class SQLWrapper {
     private ThreadPoolExecutor pool = (ThreadPoolExecutor) Executors.newCachedThreadPool();
     private static V8 v8 = com.github.newk5.vcmp.javascript.plugin.internals.Runtime.v8;
 
-   
     public SQLWrapper() {
     }
 
@@ -87,9 +86,13 @@ public class SQLWrapper {
                     }
                 } catch (Exception ex) {
                     Logger.error(ex);
+                    Logger.error("Failed to execute query: " + query.toString());
+                    console.error("Failed to execute query: " + query.toString());
+
                     if (ex.getCause() == null) {
                         if (ex.getMessage() != null) {
                             console.error(ex.getMessage());
+
                         }
                     } else {
                         console.error(ex.getCause().toString());
@@ -99,32 +102,46 @@ public class SQLWrapper {
         } else {
             Statement s = null;
             ResultSet r = null;
-            if (query instanceof String) {
-                s = c.createStatement();
-                try {
-                    r = s.executeQuery(query.toString());
-                } catch (SQLException sQLException) {
-                    s.executeUpdate(query.toString());
+            try {
+                if (query instanceof String) {
+                    s = c.createStatement();
+                    try {
+                        r = s.executeQuery(query.toString());
+                    } catch (SQLException sQLException) {
+                        s.executeUpdate(query.toString());
+                    }
+                } else if (query instanceof Statement) {
+                    PreparedStatement p = (PreparedStatement) query;
+                    try {
+                        r = p.executeQuery();
+                    } catch (SQLException sQLException) {
+                        p.executeUpdate();
+                    }
+                    s = (Statement) p;
                 }
-            } else if (query instanceof Statement) {
-                PreparedStatement p = (PreparedStatement) query;
-                try {
-                    r = p.executeQuery();
-                } catch (SQLException sQLException) {
-                    p.executeUpdate();
+                if (!multiple) {
+                    V8Object obj = SQLWrapper.toObject(r);
+                    r.close();
+                    s.close();
+                    return obj;
+                } else {
+                    V8Array arr = SQLWrapper.toArray(r);
+                    r.close();
+                    s.close();
+                    return arr;
                 }
-                s = (Statement) p;
-            }
-            if (!multiple) {
-                V8Object obj = SQLWrapper.toObject(r);
-                r.close();
-                s.close();
-                return obj;
-            } else {
-                V8Array arr = SQLWrapper.toArray(r);
-                r.close();
-                s.close();
-                return arr;
+            } catch (Exception ex) {
+                Logger.error(ex);
+                Logger.error("Failed to execute query: " + query.toString());
+                console.error("Failed to execute query: " + query.toString());
+
+                if (ex.getCause() == null) {
+                    if (ex.getMessage() != null) {
+                        console.error(ex.getMessage());
+                    }
+                } else {
+                    console.error(ex.getCause().toString());
+                }
             }
 
         }
@@ -157,8 +174,13 @@ public class SQLWrapper {
                     v8obj.add(r.getMetaData().getColumnName(i), (Boolean) obj);
                 } else if (obj instanceof String) {
                     v8obj.add(r.getMetaData().getColumnName(i), obj.toString());
-                } else if (obj instanceof Double) {
-                    v8obj.add(r.getMetaData().getColumnName(i), (Double) obj);
+                } else if (obj instanceof Double || obj instanceof Float) {
+                    if (obj instanceof Float) {
+                        Double val = ((Float) obj).doubleValue();
+                        v8obj.add(r.getMetaData().getColumnName(i), val);
+                    } else {
+                        v8obj.add(r.getMetaData().getColumnName(i), (Double) obj);
+                    }
                 } else if (obj instanceof Integer) {
                     v8obj.add(r.getMetaData().getColumnName(i), (Integer) obj);
                 } else if (obj instanceof Long) {
@@ -203,8 +225,13 @@ public class SQLWrapper {
                     v8obj.add(r.getMetaData().getColumnName(i), (Boolean) obj);
                 } else if (obj instanceof String) {
                     v8obj.add(r.getMetaData().getColumnName(i), obj.toString());
-                } else if (obj instanceof Double) {
-                    v8obj.add(r.getMetaData().getColumnName(i), (Double) obj);
+                } else if (obj instanceof Double || obj instanceof Float) {
+                    if (obj instanceof Float) {
+                        Double val = ((Float) obj).doubleValue();
+                        v8obj.add(r.getMetaData().getColumnName(i), val);
+                    } else {
+                        v8obj.add(r.getMetaData().getColumnName(i), (Double) obj);
+                    }
                 } else if (obj instanceof Integer) {
                     v8obj.add(r.getMetaData().getColumnName(i), (Integer) obj);
                 } else if (obj instanceof Long) {
